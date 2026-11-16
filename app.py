@@ -38,15 +38,13 @@ def make_data():
 
 df = make_data()
 
-# ---------- AI CONNECTION ----------
-def ask_ai(feature, question, context):
-    key = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-    if not key:
-        return ("**AI is not connected yet.** Add your OpenAI API key in "
-                "Streamlit → App settings → Secrets. The employee data and "
-                "interactive demo remain available in the meantime.")
 
-    model = st.secrets.get("OPENAI_MODEL", "gpt-4.1-mini")
+def ask_ai(feature, question, context):
+    key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+
+    if not key:
+        return "Gemini AI is not connected. Add GEMINI_API_KEY in Streamlit Secrets."
+
     instructions = """
     You are Groww Pulse, an evidence-based HR performance intelligence assistant.
     Analyse only the supplied synthetic data. Separate observed facts from
@@ -55,28 +53,41 @@ def ask_ai(feature, question, context):
     Fairness alerts are prompts for human investigation, not proof of bias.
     Do not infer sensitive personal traits. Be clear, structured and concise.
     """
-    payload = {
-        "model": model,
-        "instructions": instructions,
-        "input": f"Module: {feature}\nQuestion: {question}\nData:\n{json.dumps(context, default=str)}"
-    }
+
+    context_text = json.dumps(context, default=str)[:15000]
+    prompt = (
+        f"{instructions}\n\nModule: {feature}\n"
+        f"Question: {question}\n\nSynthetic data:\n{context_text}"
+    )
+
     try:
         response = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={"Authorization": f"Bearer {key}",
-                     "Content-Type": "application/json"},
-            json=payload, timeout=60
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+            headers={
+                "x-goog-api-key": key,
+                "Content-Type": "application/json"
+            },
+            json={
+                "contents": [{
+                    "parts": [{"text": prompt}]
+                }]
+            },
+            timeout=60
         )
         response.raise_for_status()
         result = response.json()
+
         return "\n".join(
-            item.get("text", "")
-            for block in result.get("output", [])
-            for item in block.get("content", [])
-            if item.get("type") == "output_text"
-        ) or "The AI returned no text."
+            part.get("text", "")
+            for part in result["candidates"][0]["content"]["parts"]
+            if "text" in part
+        ) or "Gemini returned no text."
+
+    except requests.exceptions.HTTPError as e:
+        return f"Gemini API error: {e} — {response.text[:1000]}"
     except Exception as e:
         return f"AI connection error: {e}"
+
 
 # ---------- DESIGN ----------
 st.markdown("""

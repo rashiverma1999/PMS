@@ -62,7 +62,7 @@ def ask_ai(feature, question, context):
 
     try:
         response = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-4-hydrogen:generateContent",
             headers={
                 "x-goog-api-key": key,
                 "Content-Type": "application/json"
